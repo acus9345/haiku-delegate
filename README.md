@@ -16,9 +16,18 @@ Each agent gets a fixed brief: a goal, exact inputs, numbered commands, "do not"
 git clone https://github.com/acus9345/haiku-delegate ~/.claude/skills/haiku-delegate
 ```
 
+Then install the agent the skill launches, which runs on Haiku and auto-compacts at a 100,000-token window (this needs Claude Code v2.1.296 or later):
+
+```bash
+mkdir -p ~/.claude/agents && cp ~/.claude/skills/haiku-delegate/agents/haiku-worker.md ~/.claude/agents/
+```
+
+Without it, the skill falls back to `general-purpose` agents on Haiku, which compact at the model's default window.
+
 ## Files
 
 - `SKILL.md`: when to delegate, how to plan, launch, verify and wrap up, and a worked example (publishing 5 npm packages).
 - `references/brief-template.md`: the brief template and four filled-in examples.
 - `references/not-for-haiku.md`: what stays on the main model, and why.
+- `agents/haiku-worker.md`: the subagent definition (Haiku, no nested agents or direct file edits, 100,000-token auto-compact window).
 - `workspace/`: the dry runs used to develop the skill. It holds the eval prompts, the test fixtures (`scripts/make-fixtures.sh` rebuilds them, including their git history), the generated plans, briefs and feedback for iterations 1 and 2, and a snapshot and diff of each skill version. The repo copies under `workspace/iteration-*/` have had their `.git` folders removed.

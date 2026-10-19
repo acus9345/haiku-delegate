@@ -91,12 +91,14 @@ Name the report items in the brief. Use one item per package or repo, but when a
 ```
 Agent({
   description: "Publish @acme/core 1.0.0",
-  subagent_type: "general-purpose",
+  subagent_type: "haiku-worker",
   model: "haiku",
   run_in_background: true,
   prompt: "<the complete filled-in brief>"
 })
 ```
+
+`haiku-worker` is defined in `~/.claude/agents/haiku-worker.md`. It runs on Haiku, can't spawn agents or edit files directly, and auto-compacts at a 100,000-token window, the lowest per-agent value Claude Code allows. That keeps a long CI watch or a noisy install from filling a huge context. If that agent type isn't available, use `subagent_type: "general-purpose"` with the same `model: "haiku"`; it then compacts at the model's default window.
 
 - At most 4 Haiku agents run at once. Launch every brief whose gate is met together in one message, up to 4. Each time an agent finishes, verify its result, then launch whatever that result unblocks.
 - Run them in the background by default and keep working on main-model steps meanwhile. You're notified when each agent finishes, so don't poll.
