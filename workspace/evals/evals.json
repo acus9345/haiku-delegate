@@ -1,0 +1,36 @@
+{
+  "skill_name": "haiku-delegate",
+  "evals": [
+    {
+      "id": 1,
+      "name": "publish-3-packages",
+      "prompt": "(earlier: \"use haiku for the mechanical parts\") publish these 3 already-built packages, tag them and verify installs",
+      "expected_output": "Main model does preflight and review; Haiku briefs cover publish+tag per package and install checks. @quillkit/cli (depends on fmt and lint) is published and install-checked only after fmt and lint are verified. Every brief has all six template sections with exact versions and tags. No repo creation or trusted publishing, since neither was asked for.",
+      "files": ["fixtures/eval1-quillkit/fmt", "fixtures/eval1-quillkit/lint", "fixtures/eval1-quillkit/cli"],
+      "assertions": [
+        "Every brief has Goal, Inputs, Steps, Do not, Stop conditions and Report sections",
+        "Briefs use exact values: @quillkit/fmt 1.2.0 / v1.2.0, @quillkit/lint 1.2.0 / v1.2.0, @quillkit/cli 0.9.1 / v0.9.1",
+        "@quillkit/cli publish is ordered after fmt and lint are verified on npm",
+        "No more than 4 Haiku agents are planned to run at once; all use model haiku and run in the background",
+        "Plan lists read-only verification commands (npm view, gh api for tags) after each wave",
+        "No brief creates repos, sets up trusted publishing, or does anything else not requested",
+        "No Agent tool call was actually made and nothing touched the network"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "fix-bug-and-release",
+      "prompt": "(earlier: \"delegate the busywork\") fix this bug and release it",
+      "expected_output": "Main model fixes slugify (collapse repeated separators), adds tests, picks 2.3.1, writes the changelog entry and commit message. Haiku briefs cover only the release mechanics from RELEASING.md: push main, push tag v2.3.1, watch the release workflow, check npm and a clean install. No brief runs npm publish by hand.",
+      "files": ["fixtures/eval2-slug/slug"],
+      "assertions": [
+        "The bug fix and its tests are done on the main model, not in any brief",
+        "slugify('Hello   World') returns 'hello-world' and the test suite passes in the run's repo copy",
+        "Version 2.3.1 and the changelog text are decided on the main model",
+        "Briefs cover push, tag, CI watch and install check with exact values",
+        "No brief runs npm publish (RELEASING.md says the workflow publishes)",
+        "No Agent tool call was actually made and nothing touched the network"
+      ]
+    }
+  ]
+}

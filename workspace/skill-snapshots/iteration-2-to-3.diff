@@ -1,0 +1,245 @@
+diff --git a/skill-snapshots/iteration-2/SKILL.md b/skill-snapshots/iteration-3/SKILL.md
+index cf5145a..0911379 100644
+--- a/skill-snapshots/iteration-2/SKILL.md
++++ b/skill-snapshots/iteration-3/SKILL.md
+@@ -69,7 +69,14 @@ Approving an action doesn't approve everything it sets off. Before launching, ch
+ 
+ If a side effect needs approval the user hasn't given (closing an issue, a second publish, a deploy), change the plan to avoid it (write `(#41)`, not `Fixes #41`), or ask. If it's harmless but visible (a failing Actions run), mention it in one line when you launch. Either way, the brief tells the agent what the action will set off and to leave it alone, unless watching it is the job.
+ 
+-Haiku agents never enter passwords, tokens, OTPs or 2FA codes, and never run login commands. When a step needs the user's approval in a browser, the agent stops and reports `NEEDS_USER` with the URL or prompt it saw. By the time you read that report, the agent's command has exited, so the URL or code prompt is usually dead. Give the user the exact command to run themselves, verify the result, and continue with a brief that starts after that step. If preflight shows npm asks for 2FA on every publish (`npm profile get --json` reports `auth-and-writes`), don't delegate publishes at all.
++**Release preflight.** Before writing release briefs, run these read-only checks yourself. Their results become the briefs' exact inputs:
++
++- **Remote state:** `git ls-remote origin refs/heads/main refs/tags/<tag>`. Main should be at the SHA your local work builds on, and the tag shouldn't exist yet. Don't rely on `origin/main`: a fresh or copied clone may have none, and it can be stale.
++- **npm state:** for a new package, `npm view <pkg>` returns E404. For an existing one, `npm view <pkg> versions --json --prefer-online` doesn't list the new version.
++- **What will ship:** if the package ships gitignored build output, record the `integrity` and `entryCount` from `npm pack --dry-run --json --ignore-scripts` while you review the file list. The publish brief checks both just before publishing.
++- **2FA, for local publishes:** if `npm profile get --json` reports `auth-and-writes`, every publish needs a code nobody here can enter. Don't delegate publishes at all; plan for the user to run them.
++
++Haiku agents never enter passwords, tokens, OTPs or 2FA codes, and never run login commands. When a step needs the user's approval in a browser, the agent stops and reports `NEEDS_USER` with the URL or prompt it saw. A publish can also stall: npm may print "Authenticate your account at …" and wait, so the agent sees its command time out rather than a prompt. The template tells it to report that as `NEEDS_USER` with the link too. By the time you read that report, the agent's command has exited, so the URL or code prompt is usually dead. Give the user the exact command to run themselves, verify the result, and continue with a brief that starts after that step.
+ 
+ ### 3. Write one brief per agent
+ 
+@@ -105,11 +112,11 @@ Each agent's report is a claim. Before telling the user something is done, check
+ | npm package published | `npm view <pkg>@<version> version --prefer-online`; for a local publish, `npm view <pkg>@<version> dist.integrity` matches your `npm pack --dry-run --json`; for a CI publish, `npm view <pkg>@<version> gitHead` is the tagged commit |
+ | repo created | `gh api repos/<owner>/<repo> --jq .html_url` |
+ | branch pushed | `gh api repos/<owner>/<repo>/commits/<branch> --jq .sha` matches the reported SHA |
+-| tag pushed | `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha` is the commit you pinned in the brief (a ref with the right name can still point at the wrong commit) |
++| tag pushed | `gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq '.object.type + " " + .object.sha'` prints `tag <tag object SHA from the brief>`, and `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha` is the commit you pinned. A tag with the right name can still be someone else's, or point at the wrong commit |
+ | release created | `gh api repos/<owner>/<repo>/releases/tags/<tag> --jq .html_url` |
+ | CI result | `gh run list --repo <owner>/<repo> --commit <sha> --json databaseId,workflowName,status,conclusion` |
+ | trusted publishing | `npm trust list <pkg>` |
+-| install check | `npm view` shows the version is live; accept the agent's `--version` output if it's quoted exactly, otherwise rerun one check yourself |
++| install check | `npm view` shows the version is live; accept the agent's `--version` output (or, for a library with no bin, its smoke-test output) if it's quoted exactly, otherwise rerun one check yourself |
+ | tests / lint | the agent's quoted summary line and exit code; for a pushed commit, the CI run on that SHA |
+ 
+ If a check disagrees with the report, the check wins and the item counts as failed.
+@@ -146,7 +153,9 @@ Then two short lines: **Left:** steps not done yet. **Needs you:** approvals, br
+ Many repos publish from a workflow when a `v*` tag is pushed; RELEASING.md and `.github/workflows/` tell you. Then the tag push is the publish, and the plan changes:
+ 
+ - **No `npm publish` in any brief.** Put it in the Do-not list explicitly, so that when the run fails, a hand publish isn't the agent's obvious "fix".
+-- **Check the pipeline before the tag goes out,** because a failure afterwards leaves a public tag with nothing on npm. On the main model, read-only:
++- **Check the pipeline before the tag goes out,** because a failure afterwards leaves a public tag with nothing on npm. On the main model, read-only, on top of the release preflight in step 2:
++  - `git ls-remote origin refs/heads/main refs/tags/<tag>` shows main where you expect and no tag yet;
++  - `npm view <pkg>@<version> version --prefer-online` shows the version isn't published yet (the brief checks again before pushing);
+   - `npm trust list <pkg>` lists this repo and workflow file;
+   - `gh api repos/<owner>/<repo>/actions/workflows --jq '.workflows[] | [.path,.state] | @tsv'` shows the workflow as `active`;
+   - `gh run list --repo <owner>/<repo> --workflow <file> --limit 1 --json headBranch,conclusion` shows the last release run succeeded.
+@@ -180,13 +189,15 @@ Then check side effects. Each package's `release.yml` runs on `v*` tags and publ
+ [main]  Verify everything + wrap-up table
+ ```
+ 
+-At five packages, the pack check and secret scan are worth an agent. For two or three small packages, run them yourself. Repo creation goes to a single agent because GitHub throttles bursts of new repos.
++At five packages, the pack check and secret scan are worth an agent. For two or three small packages, run them yourself. Either way, each tarball's `integrity` and `entryCount` from that check go into its publish brief, because `dist/` is gitignored. Repo creation goes to a single agent because GitHub throttles bursts of new repos.
+ 
+ **Publishing.** Four briefs like Example 1 in `references/brief-template.md`, one per package, launch in one message with `run_in_background: true`. That fills all four slots. While they run, you write the remaining briefs. As each report arrives, verify it:
+ 
+ ```
+-npm view @acme/core@1.0.0 version --prefer-online       → 1.0.0
+-gh api repos/acme/core/commits/v1.0.0 --jq .sha         → the SHA you tagged
++npm view @acme/core@1.0.0 version --prefer-online                                   → 1.0.0
++npm view @acme/core@1.0.0 dist.integrity                                            → the integrity in the brief
++gh api repos/acme/core/git/ref/tags/v1.0.0 --jq '.object.type + " " + .object.sha'  → tag <the tag object SHA in the brief>
++gh api repos/acme/core/commits/v1.0.0 --jq .sha                                     → the commit you tagged
+ ```
+ 
+ Once core checks out, its install check takes the free slot right away, without waiting for http or test-kit. Once core and utils both check out, the cli brief launches.
+diff --git a/skill-snapshots/iteration-2/references/brief-template.md b/skill-snapshots/iteration-3/references/brief-template.md
+index 952894d..88e3b38 100644
+--- a/skill-snapshots/iteration-2/references/brief-template.md
++++ b/skill-snapshots/iteration-3/references/brief-template.md
+@@ -47,7 +47,7 @@ You are running a fixed, fully specified job for another Claude session. Run the
+ - Stop at the first error: a nonzero exit code, an error message, or output that doesn't match Expect. Don't run any later step. Report every item you didn't finish as `skipped`, with the reason.
+ - Rate limit (E429, `429`, "Too Many Requests", "rate limit", "secondary rate limit", "created too many repositories", "was submitted too quickly"): stop at once. Never retry.
+ - Auth error (401, 403, E401, E403, ENEEDAUTH, "Bad credentials", "Permission denied", "requires authentication", "terminal prompts disabled", "could not read Username", a prompt to log in): stop at once. Never retry.
+-- Browser or 2FA approval (a request for a one-time password, or a URL to approve in a browser): stop. Report the item as `skipped` with an error that starts `NEEDS_USER:` followed by the URL or the prompt text.
++- Browser or 2FA approval (a request for a one-time password, or a URL to approve in a browser): stop. Report the item as `skipped` with an error that starts `NEEDS_USER:` followed by the URL or the prompt text. This includes a command that prints a sign-in link and then waits until the tool times out (npm prints "Authenticate your account at https://www.npmjs.com/auth/…"): report that as `NEEDS_USER:` with the link, not as a timeout.
+ - Network timeout (ETIMEDOUT, ECONNRESET, ESOCKETTIMEDOUT, "network timeout" printed by the program): you may rerun that one step once. If it fails again, stop. If the tool itself times out instead (the command is cut off with no error from the program), that is not a network timeout: stop and report, unless the step says otherwise. Never rerun a publish or push that was cut off.
+ - Anything unexpected (a missing file, a different version, a dirty working tree, a prompt you didn't expect): stop and report it. Don't adapt.
+ 
+@@ -70,15 +70,17 @@ End your reply with one block for each of these report items, in this order: <it
+ - **Exact means exact.** Absolute paths, package names with their scope, full versions, the full commit message (with any trailer lines the session requires), and the exact text of any file edit. For edits longer than a line or two, write a patch or message file first and pass its path, which also avoids shell-quoting mistakes.
+ - **Approval first.** Every outward-facing step must already be approved by the user in this session before it goes into a brief.
+ - **Every step starts with `cd`, and every path is quoted.** Each of the agent's tool calls starts fresh: the working directory and shell variables don't carry over. So start every command with `cd "<absolute path>" &&`, and pass fixed paths as inputs instead of `$(mktemp -d)` results. Quote paths even when they have no spaces, because the agent copies the style it sees, and Windows paths often do have spaces.
+-- **Name the shell, and write for it.** On Windows the Bash tool is Git Bash (`/c/Users/...` paths).
+-- **Create local commits and tags yourself, then pin them.** A commit or tag that records your decisions is made on the main model before launch (see SKILL.md). The brief then gives its exact SHA, and the first steps check HEAD and the tag against it, so nothing lands on a commit nobody looked at. Take tag names and messages from the repo's existing tags: `git for-each-ref refs/tags --format='%(refname:short) %(objecttype) %(contents:subject)'`.
+-- **Make steps safe to rerun.** Check whether the thing already exists before creating it, and have the agent report `skipped` with evidence if it does. Put these checks before the irreversible step (check the tag is free on the remote before publishing, not after). A corrected brief after a partial failure is then safe to run.
++- **Name the shell, and write for it.** On Windows the Bash tool is Git Bash (`/c/Users/...` paths). Keep command arguments ASCII: accented characters can get mangled between Git Bash and `node.exe`, so use `è`-style escapes inside JS strings.
++- **Create local commits and tags yourself, then pin them.** A commit or tag that records your decisions is made on the main model before launch (see SKILL.md). The brief then gives the commit SHA and, for an annotated tag, the tag object SHA (`git rev-parse <tag>`), and the first steps check HEAD and the tag against both. That way nothing lands on a commit nobody looked at, and a tag with the same name made by someone else can't pass. Take tag names and messages from the repo's existing tags: `git for-each-ref refs/tags --format='%(refname:short) %(objecttype) %(contents:subject)'`.
++- **Read the remote with `git ls-remote`.** Get the remote's current SHAs from `git ls-remote origin refs/heads/main refs/tags/<tag>`, not from `origin/main`: a fresh or copied clone may have no remote-tracking ref, and one that exists can be stale.
++- **Make steps safe to rerun.** Check whether the thing already exists before creating it, and have the agent report `skipped` with evidence if it does. Put these checks before the irreversible step (check the tag is free on the remote and the version is free on npm before publishing or pushing the tag, not after). A corrected brief after a partial failure is then safe to run.
++- **Pin the tarball when build output is gitignored.** If `dist/` (or whatever `files` ships) is in `.gitignore`, `git status` says nothing about what will be published. Record the `integrity` and `entryCount` from `npm pack --dry-run --json --ignore-scripts` when you review the file list, and add a step just before the publish that checks both values. Tell the agent to match the `"integrity": "…"` and `"entryCount": N` lines, because the JSON's outer shape differs between npm versions. `--ignore-scripts` stops a `prepack` script from rebuilding in between. If either value differs, the agent stops; it doesn't rebuild.
+ - **Keep network commands non-interactive.** On Windows, Git Credential Manager opens a login window instead of printing a prompt, so a background push hangs until the tool times out. Prefix git network commands (`push`, `pull`, `fetch`, `ls-remote`) with `GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never` so they fail loudly. Run `npm publish` with `</dev/null`. Pass `--yes`/`-y` where the tool has one and the action is approved, and avoid commands that open an editor (`git commit` without `-m`/`-F`, `git tag -a` without `-m`).
+ - **Mark expected errors and benign noise.** If a step is supposed to fail, say so in its Expect line, or the agent will stop there. `npm view <pkg>@<unpublished version>` gives E404 "No match found for version" on current npm, while older npm versions print nothing and exit 0, so accept both. Also say which extra output is fine (`npm notice`/`npm warn` lines with exit code 0).
+ - **Use `--prefer-online`** on `npm view` and `npm install` right after a publish, so a stale local cache doesn't give a false "not found".
+ - **Say what each outward action sets off.** If a push starts a workflow, the brief says so and tells the agent not to watch, rerun or cancel it, unless watching it is the job. If the workflow publishes, the Do-not list forbids `npm publish` outright.
+ - **Waiting for something to appear.** Agents can't sleep between checks (foreground `sleep` may be blocked), so write a wait as a bounded repeat of a read-only command: "If you get `[]`, run exactly the same command again, up to 10 runs in total. `[]` at first is expected, not an error. If it's still `[]` after the 10th run, stop and report `failed` with `<text>`." For a long watch such as `gh run watch <id> --exit-status`, tell the agent to set the Bash tool timeout to 600000 ms (the maximum) and allow exactly one rerun of the watch if the tool times out. Watching is read-only, so a rerun is safe there, unlike a publish.
+-- **Values from earlier steps.** A brief may tell the agent to copy one identifier printed by an earlier step into a later command, for example a run ID: "Replace `RUN_ID` with the `databaseId` from step 6, and nothing else." This is for identifiers the agent can read off the output, never for choices.
++- **Values from earlier steps.** A brief may tell the agent to copy one identifier printed by an earlier step into a later command, for example a run ID: "Replace `RUN_ID` with the `databaseId` from step 7, and nothing else." This is for identifiers the agent can read off the output, never for choices.
+ - **Name the report items.** List them in the Report section, in order. Use one item per package or repo, but when an item has several outward actions (push main, push tag, CI run), give each action its own item, so a partial failure is unambiguous.
+ - **MCP tools are fine.** If the session has a tool for the job (a publishing MCP server, say), list that tool call with exact arguments instead of a shell command. The same rules apply. For a tool that returns a job id, include the polling step as a bounded repeat and say what result counts as done.
+ - **Several items in one agent:** list the order explicitly. Stop-at-first-error applies to the whole brief, so put independent items in separate agents when you want one failure not to block the others.
+@@ -87,7 +89,7 @@ When you send a brief, include every section in full. Examples 2, 3 and 4 below
+ 
+ ## Example 1: publish a package and push its tag
+ 
+-Context: `@acme/core` 1.0.0 is built in `C:\work\acme\packages\core`, which is its own repo with `origin` at `github.com/acme/core` and `main` already pushed at `3f9c2a7…`. The main model created the annotated tag `v1.0.0` locally on that commit, matching the repo's existing tags (message = tag name). The repo's release workflow runs on `v*` tags and will fail because 1.0.0 is already published; the main model told the user. The user approved publishing to npm as a public package and pushing tag `v1.0.0`.
++Context: `@acme/core` 1.0.0 is built in `C:\work\acme\packages\core`, which is its own repo with `origin` at `github.com/acme/core`. Preflight `git ls-remote` showed `main` on origin at `3f9c2a7…`, the same as local HEAD. The main model created the annotated tag `v1.0.0` locally on that commit, matching the repo's existing tags (message = tag name). `dist/` is gitignored, so the main model reviewed the `npm pack --dry-run --json --ignore-scripts` file list and recorded its integrity and entry count. The repo's release workflow runs on `v*` tags and will fail because 1.0.0 is already published; the main model told the user. The user approved publishing to npm as a public package and pushing tag `v1.0.0`.
+ 
+ ````markdown
+ # Task: Publish @acme/core 1.0.0 to npm and push tag v1.0.0
+@@ -103,7 +105,8 @@ You are running a fixed, fully specified job for another Claude session. Run the
+ - Package: @acme/core
+ - Version: 1.0.0
+ - Commit: 3f9c2a7e5b1d4c8a9e0f6b2d7c4a1e8f5b3d9c0a (HEAD of main, already on origin)
+-- Tag: v1.0.0, annotated, already created locally on that commit
++- Tag: v1.0.0, annotated, already created locally on that commit. Tag object: 8d4b1f6e2c9a7035b1e8d2f4a6c0e9b3d7f5a128
++- Tarball: integrity sha512-209H7yLh/mXsMPQ2y7LC9xXziLv78j+66lDTWbwhcNDRmohvNAB831OyhKYMS4rGruu//LkKQSm3avXsqn4YTw==, 7 files
+ - Remote: origin (https://github.com/acme/core.git)
+ - Pushing the tag starts the repo's `release` workflow on GitHub Actions. That run is expected to fail and is not part of this job.
+ 
+@@ -112,15 +115,18 @@ You are running a fixed, fully specified job for another Claude session. Run the
+    Expect: no status lines, then `main`, then `3f9c2a7e5b1d4c8a9e0f6b2d7c4a1e8f5b3d9c0a`.
+ 2. `cd "/c/work/acme/packages/core" && node -p "const p=require('./package.json'); p.name+'@'+p.version"`
+    Expect: `@acme/core@1.0.0`
+-3. `cd "/c/work/acme/packages/core" && git cat-file -t v1.0.0 && git rev-parse "v1.0.0^{commit}"`
+-   Expect: `tag`, then `3f9c2a7e5b1d4c8a9e0f6b2d7c4a1e8f5b3d9c0a`.
++3. `cd "/c/work/acme/packages/core" && git cat-file -t v1.0.0 && git rev-parse v1.0.0 && git rev-parse "v1.0.0^{commit}"`
++   Expect: `tag`, then `8d4b1f6e2c9a7035b1e8d2f4a6c0e9b3d7f5a128`, then `3f9c2a7e5b1d4c8a9e0f6b2d7c4a1e8f5b3d9c0a`.
+ 4. `cd "/c/work/acme/packages/core" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git ls-remote --tags origin refs/tags/v1.0.0`
+    Expect: exit code 0 and no output, meaning the tag isn't on origin yet. If it prints a line, stop and report that line. Do not publish.
+-5. `cd "/c/work/acme/packages/core" && npm view @acme/core@1.0.0 version --prefer-online`
++5. `cd "/c/work/acme/packages/core" && npm pack --dry-run --json --ignore-scripts`
++   Expect: exit code 0, a line `"integrity": "sha512-209H7yLh/mXsMPQ2y7LC9xXziLv78j+66lDTWbwhcNDRmohvNAB831OyhKYMS4rGruu//LkKQSm3avXsqn4YTw=="` and a line `"entryCount": 7`. If either value differs, stop and report both lines. Do not rebuild, reinstall or publish.
++6. `cd "/c/work/acme/packages/core" && npm view @acme/core@1.0.0 version --prefer-online`
+    Expect: an E404 error ("No match found for version 1.0.0" or "Not Found"), or no output with exit code 0. Both mean 1.0.0 isn't published yet; here they are the expected result, not a failure. If it prints `1.0.0` instead, the version is already published: report the publish item as `skipped` with evidence "1.0.0 already on npm", report the tag item as `skipped`, and stop.
+-6. `cd "/c/work/acme/packages/core" && npm publish --access public </dev/null`
++7. `cd "/c/work/acme/packages/core" && npm publish --access public </dev/null`
+    Expect: exit code 0 and a line `+ @acme/core@1.0.0`. Lines starting with `npm notice` or `npm warn` are fine as long as the exit code is 0 and the `+` line appears.
+-7. `cd "/c/work/acme/packages/core" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git push origin refs/tags/v1.0.0`
++   If the output shows a sign-in link ("Authenticate your account at …") and the tool times out, report the publish item as `skipped` with `NEEDS_USER:` and the link. Do not rerun.
++8. `cd "/c/work/acme/packages/core" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git push origin refs/tags/v1.0.0`
+    Expect: exit code 0 and a line containing `[new tag]` and `v1.0.0 -> v1.0.0`.
+ 
+ ## Do not
+@@ -133,17 +139,18 @@ You are running a fixed, fully specified job for another Claude session. Run the
+ - Do not put secret values in your report. Give the file and line only.
+ - Do not create or change tags (`git tag`), and do not push anything except `refs/tags/v1.0.0`: no branch pushes, no `git push --tags`, no `--follow-tags`.
+ - Do not look at, wait for, rerun or cancel GitHub Actions runs.
++- Do not run `npm run build`, `npm install`, `npm ci`, `npm version`, or `npm pack` without `--dry-run`. Anything that rebuilds would change the tarball you were told to publish.
+ 
+ ## Stop conditions
+ - Stop at the first error: a nonzero exit code, an error message, or output that doesn't match Expect. Don't run any later step. Report every item you didn't finish as `skipped`, with the reason.
+ - Rate limit (E429, `429`, "Too Many Requests", "rate limit", "secondary rate limit", "created too many repositories", "was submitted too quickly"): stop at once. Never retry.
+ - Auth error (401, 403, E401, E403, ENEEDAUTH, "Bad credentials", "Permission denied", "requires authentication", "terminal prompts disabled", "could not read Username", a prompt to log in): stop at once. Never retry.
+-- Browser or 2FA approval (a request for a one-time password, or a URL to approve in a browser): stop. Report the item as `skipped` with an error that starts `NEEDS_USER:` followed by the URL or the prompt text.
++- Browser or 2FA approval (a request for a one-time password, or a URL to approve in a browser): stop. Report the item as `skipped` with an error that starts `NEEDS_USER:` followed by the URL or the prompt text. This includes a command that prints a sign-in link and then waits until the tool times out (npm prints "Authenticate your account at https://www.npmjs.com/auth/…"): report that as `NEEDS_USER:` with the link, not as a timeout.
+ - Network timeout (ETIMEDOUT, ECONNRESET, ESOCKETTIMEDOUT, "network timeout" printed by the program): you may rerun that one step once. If it fails again, stop. If the tool itself times out instead (the command is cut off with no error from the program), that is not a network timeout: stop and report, unless the step says otherwise. Never rerun a publish or push that was cut off.
+ - Anything unexpected (a missing file, a different version, a dirty working tree, a prompt you didn't expect): stop and report it. Don't adapt.
+ 
+ ## Report
+-End your reply with one block for each of these report items, in this order: `npm publish @acme/core@1.0.0` (steps 1–6), `push tag v1.0.0` (step 7). Use exactly this shape, and put nothing after the last block:
++End your reply with one block for each of these report items, in this order: `npm publish @acme/core@1.0.0` (steps 1–7), `push tag v1.0.0` (step 8). Use exactly this shape, and put nothing after the last block:
+ 
+ ```
+ {
+@@ -160,7 +167,7 @@ End your reply with one block for each of these report items, in this order: `np
+   "item": "push tag v1.0.0",
+   "status": "ok | failed | skipped",
+   "step": "<last step number reached>",
+-  "evidence": "<the `[new tag]` line from step 7>",
++  "evidence": "<the `[new tag]` line from step 8>",
+   "error": "<exact error text, first ~20 lines, or null>"
+ }
+ ```
+@@ -266,9 +273,18 @@ A clean install of @acme/cli@1.0.0 from the public registry works, and `acme --v
+ <template block; report items, in order: `install @acme/cli@1.0.0`>
+ ````
+ 
++**Variant for a library with no bin.** There's no `--version` to run, so replace step 4 with a one-line smoke test that calls the package, and take the version from `npm ls` in step 5. Before writing the Expect line, run the same snippet yourself against the local source (`require('./src/index.js')`) so you know the exact output. For a fix release, call the function that was fixed:
++
++````markdown
++4. `cd "/c/Users/me/AppData/Local/Temp/haiku-verify/acme-slug-2.3.1" && node -e "const { slugify } = require('@acme/slug'); console.log(slugify('Hello   World')); console.log(slugify('Rock - Paper'))"`
++   Expect: exactly two lines, `hello-world` then `rock-paper`. Quote them verbatim in evidence.
++5. `cd "/c/Users/me/AppData/Local/Temp/haiku-verify/acme-slug-2.3.1" && npm ls @acme/slug`
++   Expect: a line containing `@acme/slug@2.3.1`. Quote it in evidence.
++````
++
+ ## Example 4: push a release and watch the workflow that publishes it
+ 
+-Context: the main model fixed a bug in `@acme/slug` and made two local commits on `main`: the fix, then `chore(release): v2.3.1` at `c41e9a0…`. It also created the annotated tag `v2.3.1` (tag object `5b7e2d9…`). `origin/main` is still at `a83f0c6…`. The repo's `release.yml` publishes to npm with trusted publishing when a `v*` tag is pushed, and RELEASING.md forbids publishing by hand. Before launch, the main model confirmed that `npm trust list @acme/slug` names this repo and workflow, that the workflow is active, and that the last release run succeeded. The commit messages say `(#12)`, not `Fixes #12`, so the push won't close the issue. The user approved the release as RELEASING.md describes it. Once this agent's report is verified, a separate install-check brief (like Example 3) runs after `npm view` shows 2.3.1.
++Context: the main model fixed a bug in `@acme/slug` and made two local commits on `main`: the fix, then `chore(release): v2.3.1` at `c41e9a0…`. It also created the annotated tag `v2.3.1` (tag object `5b7e2d9…`). Preflight `git ls-remote` showed `main` on origin still at `a83f0c6…`. The repo's `release.yml` publishes to npm with trusted publishing when a `v*` tag is pushed, and RELEASING.md forbids publishing by hand. Before launch, the main model confirmed that `npm trust list @acme/slug` names this repo and workflow, that the workflow is active, and that the last release run succeeded. The commit messages say `(#12)`, not `Fixes #12`, so the push won't close the issue. The user approved the release as RELEASING.md describes it. Once this agent's report is verified, a separate install-check brief (like Example 3) runs after `npm view` shows 2.3.1.
+ 
+ ````markdown
+ # Task: Push main and tag v2.3.1 of acme/slug, then watch the release workflow
+@@ -283,7 +299,7 @@ Branch main of github.com/acme/slug points at c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b
+ - Working directory: "/c/work/acme/slug". Your working directory resets between commands, so every step below starts with its own `cd`. Keep it every time.
+ - GitHub repo: acme/slug. Remote: origin (https://github.com/acme/slug.git). Branch: main.
+ - Local main to push: c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94
+-- origin/main before this job: a83f0c6d1e9b2754c8a0f3e6d9b1c4a7e2f5d803
++- main on origin before this job (from `git ls-remote`): a83f0c6d1e9b2754c8a0f3e6d9b1c4a7e2f5d803
+ - Tag: v2.3.1, annotated, already created locally. Tag object 5b7e2d9c3a1f8e6b4d0c2a9f7e5b3d1c8a6f4e20, pointing at c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94.
+ - Workflow: `release` (.github/workflows/release.yml). It starts by itself when the tag is pushed, runs the tests, and publishes @acme/slug 2.3.1 to npm. You never publish anything yourself.
+ 
+@@ -294,20 +310,22 @@ Branch main of github.com/acme/slug points at c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b
+    Expect: `tag`, then `5b7e2d9c3a1f8e6b4d0c2a9f7e5b3d1c8a6f4e20`, then `c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94`.
+ 3. `cd "/c/work/acme/slug" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git ls-remote origin refs/heads/main refs/tags/v2.3.1`
+    Expect: exactly one line, `a83f0c6d1e9b2754c8a0f3e6d9b1c4a7e2f5d803	refs/heads/main`, and no line for the tag. Anything else means the remote changed: stop and report `failed` with the full output.
+-4. `cd "/c/work/acme/slug" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git push origin main`
+-   Expect: exit code 0 and a line containing `a83f0c6..c41e9a0  main -> main`. If the push is rejected for any reason, stop. Do not pull, rebase, merge or force.
+-5. `cd "/c/work/acme/slug" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git push origin refs/tags/v2.3.1`
++4. `cd "/c/work/acme/slug" && npm view @acme/slug@2.3.1 version --prefer-online`
++   Expect: an E404 error ("No match found for version 2.3.1"), or no output with exit code 0. Both mean 2.3.1 isn't on npm yet; here they are the expected result, not a failure. If it prints `2.3.1`, the version is already published and pushing the tag would only produce a failed run: stop and report `failed` with that output. Push nothing.
++5. `cd "/c/work/acme/slug" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git push origin main`
++   Expect: exit code 0 and a line containing both `a83f0c6..c41e9a0` and `main -> main`. If the push is rejected for any reason, stop. Do not pull, rebase, merge or force.
++6. `cd "/c/work/acme/slug" && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git push origin refs/tags/v2.3.1`
+    Expect: exit code 0 and a line containing `[new tag]` and `v2.3.1 -> v2.3.1`.
+-6. `cd "/c/work/acme/slug" && gh run list --repo acme/slug --workflow release.yml --commit c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94 --json databaseId,headBranch,status,conclusion,url`
+-   Expect: a JSON array with exactly one object whose `headBranch` is `v2.3.1`. Its `databaseId` is the run ID; you need it in steps 7 and 8.
++7. `cd "/c/work/acme/slug" && gh run list --repo acme/slug --workflow release.yml --commit c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94 --json databaseId,headBranch,status,conclusion,url`
++   Expect: a JSON array with exactly one object whose `headBranch` is `v2.3.1`. Its `databaseId` is the run ID; you need it in steps 8 and 9.
+    GitHub takes a few seconds to register the run, so `[]` here is expected at first and is not an error. If you get `[]`, run exactly the same command again, up to 10 runs of this command in total. If it's still `[]` after the 10th run, stop and report `failed` with error `no release run found after 10 checks`. If the array has more than one object, stop and report the full output.
+-7. `cd "/c/work/acme/slug" && gh run watch RUN_ID --repo acme/slug --exit-status --interval 10`
+-   Replace `RUN_ID` with the `databaseId` from step 6, and nothing else. Set the Bash tool timeout to 600000 for this step.
++8. `cd "/c/work/acme/slug" && gh run watch RUN_ID --repo acme/slug --exit-status --interval 10`
++   Replace `RUN_ID` with the `databaseId` from step 7, and nothing else. Set the Bash tool timeout to 600000 for this step.
+    Expect: exit code 0 and a final line saying the run completed with `success`.
+-   If it exits nonzero, the run failed: stop and report `failed` with the run URL from step 6 and the names of the failed job and step exactly as printed. Do not open logs, rerun, cancel or retry the run.
++   If it exits nonzero, the run failed: stop and report `failed` with the run URL from step 7 and the names of the failed job and step exactly as printed. Do not open logs, rerun, cancel or retry the run.
+    If the Bash tool itself times out before the run finishes, run this same command once more with the same timeout. If it times out again, stop and report `failed` with error `run RUN_ID still in progress after 20 minutes` (with the real number).
+-8. `cd "/c/work/acme/slug" && gh run view RUN_ID --repo acme/slug --json status,conclusion,url`
+-   Replace `RUN_ID` as in step 7. Expect: `status` is `completed` and `conclusion` is `success`. Put the `url` in evidence.
++9. `cd "/c/work/acme/slug" && gh run view RUN_ID --repo acme/slug --json status,conclusion,url`
++   Replace `RUN_ID` as in step 8. Expect: `status` is `completed` and `conclusion` is `success`. Put the `url` in evidence.
+ 
+ ## Do not
+ <template list, plus:>
+@@ -317,8 +335,8 @@ Branch main of github.com/acme/slug points at c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b
+ 
+ ## Stop conditions
+ <verbatim from the template, plus:>
+-- The only repeats allowed beyond the network-timeout rerun are the ones written into steps 6 and 7.
++- The only repeats allowed beyond the network-timeout rerun are the ones written into steps 7 and 8.
+ 
+ ## Report
+-<template blocks; report items, in order: `push main` (steps 1–4), `push tag v2.3.1` (step 5), `release run` (steps 6–8)>
++<template blocks; report items, in order: `push main` (steps 1–5), `push tag v2.3.1` (step 6), `release run` (steps 7–9)>
+ ````
