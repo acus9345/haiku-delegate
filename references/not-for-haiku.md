@@ -20,7 +20,7 @@ Most borderline steps have a judgment part and a mechanical part. Do the first, 
 - **Secret scans.** Haiku runs the scanner and reports file, line and rule, never the value. Deciding whether a hit is real, and what to do about it, is yours.
 - **Trusted publishing.** Deciding which repo, workflow file and environment get publish rights is a security decision. Running `npm trust github` with those exact values is mechanical.
 - **CI failures.** Haiku can watch the run and report the conclusion and the failing job's name. Reading the log to find out why is debugging, so it comes back to you.
-- **Retries.** One retry of a clear network timeout is in every brief. Anything beyond that, including a rate limit or an auth error, comes back to you.
+- **Retries.** One retry of a clear network timeout is in the worker rules. Anything beyond that, including a rate limit or an auth error, comes back to you.
 
 ## Signs a step isn't mechanical yet
 
