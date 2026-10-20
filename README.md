@@ -33,4 +33,4 @@ Without it, the skill falls back to `general-purpose` agents on Haiku, which com
 - `references/not-for-haiku.md`: what stays on the main model, and why.
 - `references/worked-example.md`: publishing 5 npm packages end to end.
 - `agents/haiku-worker.md`: the subagent definition (Haiku, no nested agents or direct file edits, 100,000-token auto-compact window, the fixed rules).
-- `workspace/`: the dry runs used to develop the skill. It holds the eval prompts, the test fixtures (`scripts/make-fixtures.sh` rebuilds them, including their git history), the generated plans, briefs and feedback for iterations 1 and 2, and a snapshot and diff of each skill version. The repo copies under `workspace/iteration-*/` have had their `.git` folders removed.
+- `workspace/`: the dry runs used to develop the skill. It holds the eval prompts, the test fixtures (`scripts/make-fixtures.sh` rebuilds them, including their git history), the generated plans, briefs and feedback for iterations 1 to 3 (iteration 3 tests the slimmer skill), and a snapshot and diff of each skill version. The repo copies under `workspace/iteration-*/` have had their `.git` folders removed.

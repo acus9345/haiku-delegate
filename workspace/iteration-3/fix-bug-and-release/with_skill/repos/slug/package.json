@@ -1,0 +1,11 @@
+{
+  "name": "@quillkit/slug",
+  "version": "2.3.1",
+  "description": "Turn any string into a URL slug",
+  "license": "MIT",
+  "main": "src/index.js",
+  "files": ["src"],
+  "repository": { "type": "git", "url": "git+https://github.com/quillkit/slug.git" },
+  "publishConfig": { "access": "public" },
+  "scripts": { "test": "node --test" }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@quillkit/fmt",
+  "version": "1.2.0",
+  "description": "quillkit fmt",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "bin": { "quill-fmt": "dist/cli.js" },
+  "files": ["dist"],
+  "repository": { "type": "git", "url": "git+https://github.com/quillkit/fmt.git" },
+  "publishConfig": { "access": "public" },
+  "scripts": { "build": "node scripts/build.js", "test": "node --test" }
+}

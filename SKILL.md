@@ -31,7 +31,7 @@ Keep on the main model: writing code, debugging, reading unfamiliar APIs, pickin
 ## Running a delegation
 
 ### 1. Plan
-Put every delegated step on the task list, marked `[haiku]`, with a **gate**: the verified results it needs, such as "core + utils verified on npm". Launch a brief as soon as its gate is met and a slot is free. Watch for dependencies inside a batch: a package can't be installed or published before the packages it depends on.
+Put every delegated step on the task list, marked `[haiku]`, with a **gate**: the verified results it needs, such as "core + utils verified on npm". Launch a brief as soon as its gate is met and a slot is free. Watch for dependencies inside a batch: a package shouldn't be published or install-checked until the packages it depends on are verified.
 
 ### 2. Approvals and side effects
 Delegate an outward action (publish, push, create a repo, tag, change settings) only if the user approved that specific action this session. If they haven't, ask once with the full list. Before launch, check what the actions set off:
@@ -57,6 +57,7 @@ Agent({ description: "Publish @acme/core 1.0.0", subagent_type: "haiku-worker",
 - At most 4 agents at once. Launch every ready brief in one message. When one finishes, verify it, then launch whatever it unblocks.
 - Run them in the background and keep working. You'll be notified when they finish, so don't poll.
 - Consecutive steps for one item can share an agent. Put a gate between them when you want to verify an irreversible step first.
+- A read-only install check goes in the same agent as the publish or release it checks, after a bounded `npm view` wait for the registry (Examples 1 and 2). Give it its own agent only when nothing in this session published the package.
 - For a service that throttles bursts (GitHub repo creation), give the whole batch to one agent to run in sequence.
 
 ### 5. Verify
@@ -71,6 +72,7 @@ Check every claim yourself with a read-only command before reporting it. If a ch
 | release | `gh api repos/<o>/<r>/releases/tags/<t> --jq .html_url` |
 | CI | `gh run list --repo <o>/<r> --commit <sha> --json workflowName,conclusion` |
 | trusted publishing | `npm trust list <pkg>` |
+| a tag-triggered publish run after your local publish | The run failed, and `dist.integrity` still matches your pack value. |
 | install / tests | Accept the agent's quoted exact output. Otherwise rerun one check yourself. |
 
 ### 6. Failures
@@ -86,12 +88,12 @@ Give one table, built from what you verified:
 |---|---|---|
 | @acme/core 1.0.0 | published, tagged | [npm](https://www.npmjs.com/package/@acme/core/v/1.0.0) · [v1.0.0](https://github.com/acme/core/tree/v1.0.0) |
 
-Then add **Left:** (steps not done) and **Needs you:** (approvals, clicks, decisions, with links). Mark anything you couldn't verify.
+Then add **Left:** (steps not done) and **Needs you:** (approvals, clicks, decisions, issues left open, with links). Mark anything you couldn't verify.
 
 ## References
 
-- `references/brief-template.md`: the template and four examples (publish + tag, CI release + watch, install check, patch across repos).
+- `references/brief-template.md`: the template and four examples (publish + tag + install, CI release + watch, a standalone install check, patch across repos).
 - `references/worker-rules.md`: the fixed rules every agent follows.
 - `references/releases.md`: release preflight, 2FA, `NEEDS_USER`, releases that CI publishes.
 - `references/not-for-haiku.md`: what stays on the main model, and the gray areas.
-- `references/worked-example.md`: five npm packages end to end, with gates, a failure and the wrap-up.
+- `references/worked-example.md`: five npm packages end to end, with gates, a failure and the wrap-up. Read it the first time you plan a multi-package batch.

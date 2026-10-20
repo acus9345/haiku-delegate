@@ -33,6 +33,9 @@ If you launch `general-purpose` instead of `haiku-worker`, make the brief's firs
 - **Your decisions get pinned.** Make commits and tags that record your decisions locally, before launch. The brief's first steps check HEAD, the tag object SHA (`git rev-parse <tag>`) and its commit.
 - **Make steps safe to rerun.** Check that the thing doesn't already exist before the irreversible step: the tag isn't on the remote (`git ls-remote`, not `origin/main`), and the version isn't on npm.
 - **Pin the tarball when build output is gitignored.** Before publishing, check the `"integrity"` and `"entryCount"` lines from `npm pack --dry-run --json --ignore-scripts` against your values. Match the lines, not the JSON shape, and forbid rebuilds.
+- **Match fragments.** Write Expect as "a line containing `…`". Real output adds trailing commas, quotes and longer abbreviated SHAs (`a83f0c6..c41e9a0` may print longer), and a strict worker stops on any of these. Match the stable part, such as `main -> main`, and check exact SHAs in your own verification.
+- **A second directory.** A step that runs outside the working directory (for example an install folder) starts with its own `cd "<path>" &&`. List the folder under Inputs.
+- **Install after publish.** When an install check follows a publish in the same brief, put a bounded `npm view <pkg>@<v> version --prefer-online` repeat before the install, because the registry can lag.
 - **Mark expected errors and benign noise.** `npm view <pkg>@<unpublished>` gives E404 "No match found for version" on current npm, or nothing with exit 0 on older npm; accept both. `npm notice` and `npm warn` lines with exit 0 are fine.
 - **Waits are bounded repeats.** Agents can't sleep. Write "If `[]`, run the same command again, up to 10 runs in total." For `gh run watch`, set the Bash timeout to 600000 and allow one rerun, since watching is read-only.
 - **Copied values are identifiers only.** "Replace `RUN_ID` with the `databaseId` from step 7" is fine. Never leave a choice to the agent.
@@ -40,17 +43,18 @@ If you launch `general-purpose` instead of `haiku-worker`, make the brief's firs
 - **Several items in one agent.** State the order. One failure stops the whole brief, so put independent items in separate agents.
 - **Windows.** Git Bash paths look like `/c/...`. Keep arguments ASCII, and use `è`-style escapes inside JS strings.
 
-## Example 1: publish a package and push its tag
+## Example 1: publish a package, push its tag, check the install
 
-Context: `@acme/core` 1.0.0 is built, and `dist/` is gitignored. You tagged `v1.0.0` (annotated) locally on HEAD `3f9c2a7…`, which `git ls-remote` shows is already on origin's main. The tag push starts `release`, which will fail because 1.0.0 is already published, and you told the user. The user approved publishing as public and pushing the tag.
+Context: `@acme/core` 1.0.0 is built, and `dist/` is gitignored. You tagged `v1.0.0` (annotated) locally on HEAD `3f9c2a7…`, which `git ls-remote` shows is already on origin's main. The tag push starts `release`, which will fail because 1.0.0 is already published, and you told the user. The user approved publishing as public and pushing the tag. Its bin is `acme-core`.
 
 ````markdown
-# Task: Publish @acme/core 1.0.0 and push tag v1.0.0
+# Task: Publish @acme/core 1.0.0, push tag v1.0.0, check a clean install
 ## Goal
-@acme/core 1.0.0 is on npm as public, and annotated tag v1.0.0 on commit 3f9c2a7e5b1d4c8a9e0f6b2d7c4a1e8f5b3d9c0a is on github.com/acme/core.
+@acme/core 1.0.0 is on npm as public, annotated tag v1.0.0 on commit 3f9c2a7e5b1d4c8a9e0f6b2d7c4a1e8f5b3d9c0a is on github.com/acme/core, and a clean install prints 1.0.0.
 ## Inputs
 - Shell: Bash
 - Working directory: "/c/work/acme/packages/core"
+- Install folder: "/c/Users/me/AppData/Local/Temp/haiku-verify/acme-core-1.0.0" (step 9 creates it)
 - Tag object: 8d4b1f6e2c9a7035b1e8d2f4a6c0e9b3d7f5a128
 - Pushing the tag starts `release`, which is expected to fail. Don't look at it.
 ## Steps
@@ -63,19 +67,26 @@ Context: `@acme/core` 1.0.0 is built, and `dist/` is gitignored. You tagged `v1.
 4. `git ls-remote --tags origin refs/tags/v1.0.0`
    Expect: no output. Any line: stop, publish nothing.
 5. `npm pack --dry-run --json --ignore-scripts`
-   Expect: lines `"integrity": "sha512-209H7yLh/mXsMPQ2y7LC9xXziLv78j+66lDTWbwhcNDRmohvNAB831OyhKYMS4rGruu//LkKQSm3avXsqn4YTw=="` and `"entryCount": 7`. If either differs, stop.
+   Expect: a line containing `"integrity": "sha512-209H7yLh/mXsMPQ2y7LC9xXziLv78j+66lDTWbwhcNDRmohvNAB831OyhKYMS4rGruu//LkKQSm3avXsqn4YTw=="` and a line containing `"entryCount": 7`. If either differs, stop.
 6. `npm view @acme/core@1.0.0 version --prefer-online`
-   Expect: E404 ("No match found" or "Not Found"), or no output with exit 0. If it prints `1.0.0`, report both items `skipped` ("already on npm") and stop.
+   Expect: E404 ("No match found" or "Not Found"), or no output with exit 0. If it prints `1.0.0`, report all items `skipped` ("already on npm") and stop.
 7. `npm publish --access public`
-   Expect: exit 0 and `+ @acme/core@1.0.0`.
+   Expect: exit 0 and a line containing `+ @acme/core@1.0.0`.
 8. `git push origin refs/tags/v1.0.0`
-   Expect: exit 0 and a line with `[new tag]` and `v1.0.0 -> v1.0.0`.
+   Expect: exit 0 and a line containing `[new tag]`.
+9. `cd /c && test ! -e "/c/Users/me/AppData/Local/Temp/haiku-verify/acme-core-1.0.0" && mkdir -p "/c/Users/me/AppData/Local/Temp/haiku-verify/acme-core-1.0.0"`
+   Expect: exit 0. If the folder exists, stop.
+10. `cd "/c/Users/me/AppData/Local/Temp/haiku-verify/acme-core-1.0.0" && npm view @acme/core@1.0.0 version --prefer-online`
+    Expect: `1.0.0`. E404 or no output is expected at first: run the same command again, up to 10 runs in total, then stop with `1.0.0 not visible on registry`.
+11. `cd "/c/Users/me/AppData/Local/Temp/haiku-verify/acme-core-1.0.0" && npm init -y && npm install --no-audit --no-fund --prefer-online @acme/core@1.0.0 && ./node_modules/.bin/acme-core --version`
+    Expect: exit 0, a line containing `added`, then exactly `1.0.0`. Quote the version line.
 ## Do not
 - Push anything but `refs/tags/v1.0.0`, or create or change tags.
-- Run `npm run build`, `npm install`, `npm ci`, `npm version`, or `npm pack` without `--dry-run`.
+- Run `npm run build`, `npm install`, `npm ci`, `npm version`, or `npm pack` without `--dry-run` in the working directory.
+- Use `-g`, `npm link`, or a local path or tarball for the install.
 - Look at, rerun or cancel Actions runs.
 ## Report items
-`npm publish @acme/core@1.0.0` (steps 1–7), `push tag v1.0.0` (step 8)
+`npm publish @acme/core@1.0.0` (steps 1–7), `push tag v1.0.0` (step 8), `install @acme/core@1.0.0` (steps 9–11)
 ````
 
 ## Example 2: push a release that CI publishes, and watch the run
@@ -102,9 +113,9 @@ main on github.com/acme/slug is c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94, tag v2
 4. `npm view @acme/slug@2.3.1 version --prefer-online`
    Expect: E404, or no output with exit 0. If it prints `2.3.1`, stop and push nothing.
 5. `git push origin main`
-   Expect: exit 0 and a line with `a83f0c6..c41e9a0` and `main -> main`. If rejected, stop: don't pull, rebase or merge.
+   Expect: exit 0 and a line containing `main -> main`. If rejected, stop: don't pull, rebase or merge.
 6. `git push origin refs/tags/v2.3.1`
-   Expect: exit 0 and a line with `[new tag]`.
+   Expect: exit 0 and a line containing `[new tag]`.
 7. `gh run list --repo acme/slug --workflow release.yml --commit c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94 --json databaseId,headBranch,status,url`
    Expect: one object with `headBranch` `v2.3.1`. `[]` is expected at first: run the same command again, up to 10 runs in total, then stop with `no release run found`. More than one object: stop.
 8. `gh run watch RUN_ID --repo acme/slug --exit-status --interval 10`
@@ -118,9 +129,13 @@ main on github.com/acme/slug is c41e9a0b7d2f5836e1a4b9c07d3f6e2a8b5c1d94, tag v2
 `push main` (steps 1–5), `push tag v2.3.1` (step 6), `release run` (steps 7–9)
 ````
 
-## Example 3: install check
+To check the install too, append Example 1's steps 9–11 (the version wait comes first) and a fourth report item.
 
-Context: you saw `@acme/cli@1.0.0` live with `npm view`. Its bin is `acme`. You picked an unused temp folder. No approval is needed beyond the opt-in.
+## Example 3: install check on its own
+
+Use this only for a package nothing in this session published. After a publish, the check goes in the publishing agent, as in Example 1.
+
+Context: `@acme/cli@1.0.0` is live, and you saw it with `npm view`. Its bin is `acme`. You picked an unused temp folder. No approval is needed beyond the opt-in.
 
 ````markdown
 # Task: Install @acme/cli 1.0.0 in a temp folder and check `acme --version`

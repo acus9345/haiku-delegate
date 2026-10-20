@@ -14,16 +14,15 @@ The packages are core, utils, http, test-kit and cli, all at 1.0.0 and built. cl
 [main]  Review file lists and scan findings
 [haiku] Create 5 repos + push main (1 agent, sequential)           gate: review
 [main]  Tag v1.0.0 locally in each repo on the pushed SHA          gate: repos verified
-[haiku] Publish + push tag: core, utils, http, test-kit (4 agents) gate: tags made
-[haiku] Publish + push tag: cli                                    gate: core + utils verified
-[haiku] Install check, one per package                             gate: that package verified
+[haiku] Publish + tag + install check: core, utils, http, test-kit (4 agents)  gate: tags made
+[haiku] Publish + tag + install check: cli                       gate: core + utils verified
 [haiku] Trusted publishing, all 5 (1 agent, sequential)            gate: all 5 verified
 [main]  Verify + wrap-up table
 ```
 
 Repo creation goes to one agent because GitHub throttles bursts of new repos. With only 2 or 3 small packages, run the pack check yourself.
 
-**Publishing.** Four briefs like Example 1 launch in one message and fill all four slots. As each report arrives, verify it with `npm view … version --prefer-online`, `dist.integrity`, the tag ref and the tag's commit. Once core checks out, its install check takes the free slot. Once core and utils check out, cli launches.
+**Publishing.** Four briefs like Example 1 launch in one message and fill all four slots. As each report arrives, verify it with `npm view … version --prefer-online`, `dist.integrity`, the tag ref and the tag's commit, and read the quoted install output. Once core and utils check out, cli takes a free slot.
 
 **A failure.** The http agent reports:
 
@@ -36,7 +35,7 @@ ERROR: npm error code E402
 npm error 402 Payment Required - PUT https://registry.npmjs.org/@acme%2fhttp - You must sign up for private packages
 ```
 
-Its tag item comes back `skipped`. You diagnose it: there's no `publishConfig.access` and no `--access public`, and the user asked for public packages. So you send a corrected brief that starts at the publish step. An E403 or E429 would instead go to the user.
+Its tag and install items come back `skipped`. You diagnose it: there's no `publishConfig.access` and no `--access public`, and the user asked for public packages. So you send a corrected brief that starts at the publish step. An E403 or E429 would instead go to the user.
 
 If the repo agent had hit "created too many repositories" after 3 repos, you'd launch nothing else that talks to GitHub (the publish briefs push tags), tell the user 3 of 5 exist, and wait for their go-ahead.
 

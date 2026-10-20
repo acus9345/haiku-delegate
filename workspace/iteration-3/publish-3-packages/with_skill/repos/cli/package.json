@@ -1,0 +1,13 @@
+{
+  "name": "@quillkit/cli",
+  "version": "0.9.1",
+  "description": "quillkit cli",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "bin": { "quill": "dist/cli.js" },
+  "files": ["dist"],
+  "repository": { "type": "git", "url": "git+https://github.com/quillkit/cli.git" },
+  "publishConfig": { "access": "public" },
+  "scripts": { "build": "node scripts/build.js", "test": "node --test" },
+  "dependencies": { "@quillkit/fmt": "^1.2.0", "@quillkit/lint": "^1.2.0" }
+}
