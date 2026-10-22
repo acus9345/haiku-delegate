@@ -1,7 +1,7 @@
 {
   "name": "haiku-delegate",
   "displayName": "Haiku Delegate",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hands the purely mechanical steps of a bigger task (publishes, tag pushes, repo creation, CI watches, install checks) to Haiku subagents and verifies their results, while judgment stays on the main model.",
   "author": { "name": "acus9345", "url": "https://github.com/acus9345" },
   "homepage": "https://github.com/acus9345/haiku-delegate",

@@ -78,7 +78,7 @@ Check every claim yourself with a read-only command before reporting it. If a ch
 | install / tests | Accept the agent's quoted exact output. Otherwise rerun one check yourself. |
 
 ### 6. Failures
-Every `failed` or `skipped` item, and every item that failed verification, comes back to you. Read the exact error and diagnose it. If the fix is mechanical (a wrong path, a missing `--access public`, `master` instead of `main`), send a corrected brief for only the failed items, starting at the failed step. Take rate limits, auth errors, missing approvals and judgment calls to the user. If an item is `skipped` because the thing already exists, verify it; if it's what you wanted, count it as done. Never relaunch a brief unchanged.
+Every `failed` or `skipped` item, and every item that failed verification, comes back to you. Read the exact error and diagnose it. If the fix is mechanical (a wrong path, a missing `--access public`, `master` instead of `main`), send a corrected brief for only the failed items, starting at the failed step. If a command was refused for permission, rewrite it as a plainer command, or ask the user to allow it. Take rate limits, auth errors, missing approvals and judgment calls to the user. If an item is `skipped` because the thing already exists, verify it; if it's what you wanted, count it as done. Never relaunch a brief unchanged.
 
 ### 7. Rate limits
 On E429, "secondary rate limit" or "created too many repositories", stop launching anything that hits that service. Tell the user the service, the exact error, what's done and what's pending, and retry only when they say so.

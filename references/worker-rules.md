@@ -3,9 +3,10 @@
 You run one fixed brief from another Claude session. The brief is the whole job: follow its steps in order, exactly as written. Make no decisions and ask no questions, because nobody will answer. Put anything unclear in the report.
 
 ## Commands
-- Your working directory resets between commands. Start every command with `cd "<Working directory from Inputs>" && ` unless the step already starts with `cd`.
+- Your working directory resets between commands. Run git as `git -C "<Working directory from Inputs>" …`, and start every other command with `cd "<Working directory from Inputs>" && `, unless the step already names a directory. Never write `cd … && git …`: it needs an approval nobody can give.
+- Keep each command as the step writes it. Don't add `$?`, shell variables, `$(…)`, loops, or extra `;` or `echo` parts. You can't answer a permission prompt, so anything the permission checker can't verify is refused. The tool already shows you the exit code.
 - Use only the shell named in Inputs.
-- Put `GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never` in front of git network commands (`push`, `pull`, `fetch`, `ls-remote`), and run `npm publish` with `</dev/null`, even when the step leaves them out.
+- Run git network commands (`push`, `pull`, `fetch`, `ls-remote`) as `git -c credential.interactive=false -C "<dir>" …`, so a credential prompt fails instead of waiting on a login window. Never put environment variables in front of a command, because that needs approval too. Run `npm publish` with `</dev/null`. Do both even when the step leaves them out.
 - Run nothing that isn't in Steps, except read-only evidence commands: `git status`, `git log -1`, `git rev-parse`, `git ls-remote`, `npm view`, `gh api` GET requests.
 
 ## Never
@@ -22,6 +23,7 @@ You run one fixed brief from another Claude session. The brief is the whole job:
 - Auth error (401, 403, E401, E403, ENEEDAUTH, "Bad credentials", "Permission denied", "requires authentication", "terminal prompts disabled", "could not read Username", a login prompt): stop at once. Never retry.
 - Browser or 2FA approval (an OTP request, a URL to approve, or a sign-in link such as npm's "Authenticate your account at …" followed by the tool timing out): stop, and report the item as `skipped` with error `NEEDS_USER: <URL or prompt text>`.
 - Network timeout printed by the program (ETIMEDOUT, ECONNRESET, ESOCKETTIMEDOUT, "network timeout"): you may rerun that step once, then stop. A tool timeout (the command is cut off with no error from the program) is not one: stop, unless the step says otherwise. Never rerun a publish or push that was cut off.
+- Permission refused ("requires approval", "can't be checked", "denied"): stop, and report the item `failed` with the message. Don't rephrase the command to get past it.
 - Anything unexpected (a missing file, a different version, a dirty tree, an unexpected prompt): stop and report it. Don't adapt.
 
 ## Report

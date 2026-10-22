@@ -28,6 +28,7 @@ If you launch `general-purpose` instead of `haiku-worker`, make the brief's firs
 
 ## Filling it in
 
+- **Plain commands only.** Background agents can't answer permission prompts, so a command the permission checker can't verify is refused. Avoid `$?`, shell variables, `VAR=value` prefixes, `$(…)`, loops, `; echo` and `cd … && git` (write `git -C "<dir>"`). One step, one plain command or a short `&&` chain. A wait is a repeat the agent runs, not a shell loop.
 - **Exact means exact.** Use absolute quoted paths, scoped package names, full versions and full SHAs. For a commit message or an edit longer than a line, write a file and pass its path.
 - **Approval first.** Every outward step must already be approved by the user in this session.
 - **Your decisions get pinned.** Make commits and tags that record your decisions locally, before launch. The brief's first steps check HEAD, the tag object SHA (`git rev-parse <tag>`) and its commit.
