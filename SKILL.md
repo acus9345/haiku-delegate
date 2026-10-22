@@ -1,15 +1,20 @@
 ---
 name: haiku-delegate
-description: Hand the purely mechanical steps of a bigger task (publishing N packages, pushing tags, creating repos, watching CI, install checks, lint/test runs, applying a written patch to several repos) to Haiku subagents, run them in parallel and verify the results, while judgment stays on the main model. Use when the user says "use haiku for the mechanical parts", "delegate the busywork", "run the rest with cheap agents", "farm this out to cheaper models", or names haiku-delegate, or for a long fully specified batch once they opted in this session. Never spawn agents without that opt-in.
+description: Hand the purely mechanical steps of a bigger task (publishing N packages, pushing tags, creating repos, watching CI, install checks, lint/test runs, applying a written patch to several repos) to Haiku subagents, run them in parallel and verify the results, while judgment stays on the main model. Use it proactively, without being asked, whenever a task reaches a batch of such steps or a long wait (a CI run, publishes, installs) and the user has given standing permission in CLAUDE.md or memory. Also use it when the user says "use haiku for the mechanical parts", "delegate the busywork", "run the rest with cheap agents", "farm this out to cheaper models", or names haiku-delegate. With neither, don't spawn agents.
 ---
 
 # Haiku delegate
 
 Run pure-execution steps on Haiku, keep judgment on the main model, and treat every Haiku report as a claim to check.
 
-## Opt-in
+## When to use it
 
-Spawn agents only after the user opts in this session ("use haiku for…", "delegate the busywork", naming this skill). The opt-in lasts for the session. Without it, do the work yourself; you may offer once in one line. Opting in doesn't approve the actions themselves (see step 2). If `model: "haiku"` is rejected, tell the user and do the work yourself.
+Use it on your own, without waiting to be asked, as soon as the work reaches steps that pass the checklist below and delegating pays off (see "Delegate only when it pays"). That requires one of these:
+
+- **Standing permission:** the user's CLAUDE.md or memory says to use haiku-delegate automatically.
+- **In-session opt-in:** the user said "use haiku for…", "delegate the busywork", named this skill, or similar. This lasts for the session.
+
+With neither, do the work yourself; you may offer once, in one line. When you delegate without being asked, say so in one line at the first launch, for example "Handing the 3 publishes to Haiku agents." Permission to delegate doesn't approve the actions themselves (see step 2). If `model: "haiku"` is rejected, tell the user and do the work yourself.
 
 ## What goes to Haiku
 

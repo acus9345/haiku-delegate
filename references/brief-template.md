@@ -135,7 +135,7 @@ To check the install too, append Example 1's steps 9–11 (the version wait come
 
 Use this only for a package nothing in this session published. After a publish, the check goes in the publishing agent, as in Example 1.
 
-Context: `@acme/cli@1.0.0` is live, and you saw it with `npm view`. Its bin is `acme`. You picked an unused temp folder. No approval is needed beyond the opt-in.
+Context: `@acme/cli@1.0.0` is live, and you saw it with `npm view`. Its bin is `acme`. You picked an unused temp folder. No approval is needed beyond permission to delegate.
 
 ````markdown
 # Task: Install @acme/cli 1.0.0 in a temp folder and check `acme --version`

@@ -1,6 +1,6 @@
 # Worked example: publishing 5 npm packages
 
-The user opted in earlier ("use haiku for the mechanical parts"). Now they ask: "create repos for the five @acme packages in `packages/`, publish them as public, tag them, set up trusted publishing for `release.yml`, and check the installs."
+The user's CLAUDE.md gives standing permission to use haiku-delegate, so nobody has to ask for it. The user asks: "create repos for the five @acme packages in `packages/`, publish them as public, tag them, set up trusted publishing for `release.yml`, and check the installs."
 
 The packages are core, utils, http, test-kit and cli, all at 1.0.0 and built. cli depends on core and utils.
 
