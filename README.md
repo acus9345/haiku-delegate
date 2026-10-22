@@ -2,13 +2,13 @@
 
 A Claude Code skill that hands the purely mechanical steps of a bigger task to Haiku subagents, runs them in parallel, and verifies their results. Design, debugging, naming, writing and judgment calls stay on the main model.
 
-It spawns agents only with your permission. You can give it once per session, by saying something like "use haiku for the mechanical parts", "delegate the busywork" or "run the rest with cheap agents". Or you can make it automatic by adding a line like this to `~/.claude/CLAUDE.md`:
+It runs automatically. Installing the skill gives it standing permission to start Haiku agents whenever a task reaches mechanical batches or long waits, in Claude Code, Cowork, or anywhere else with an Agent tool. You can also ask for it ("use haiku for the mechanical parts", "delegate the busywork"), or say "don't delegate" to switch it off for a session. Publishing, pushing and other outward actions still need your approval as usual.
+
+Claude Code's default is not to start agents unless asked, so a line like this in `~/.claude/CLAUDE.md` backs the skill up there:
 
 ```markdown
 - Use the haiku-delegate skill automatically, without waiting for me to ask, whenever a task reaches mechanical steps it covers. This is standing permission to spawn its Haiku agents; the outward actions themselves still need my approval.
 ```
-
-Either way, publishing, pushing and other outward actions still need your approval as usual.
 
 ## What it delegates
 
