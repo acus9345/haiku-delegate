@@ -1,0 +1,12 @@
+{
+  "name": "haiku-delegate",
+  "description": "The haiku-delegate skill and its haiku-worker agent",
+  "owner": { "name": "acus9345", "url": "https://github.com/acus9345" },
+  "plugins": [
+    {
+      "name": "haiku-delegate",
+      "source": "./",
+      "description": "Delegate mechanical steps to Haiku subagents and verify the results"
+    }
+  ]
+}

@@ -18,17 +18,33 @@ Each agent gets a short brief with a goal, exact inputs, numbered commands with 
 
 ## Install
 
+### As a Claude Code plugin (recommended)
+
+This installs the skill and the `haiku-worker` agent together. In a Claude Code session, run:
+
+```
+/plugin install haiku-delegate --marketplace acus9345/haiku-delegate
+```
+
+On versions before 2.1.275, add the marketplace first:
+
+```
+/plugin marketplace add acus9345/haiku-delegate
+/plugin install haiku-delegate@haiku-delegate
+```
+
+The agent's 100,000-token auto-compact window needs Claude Code v2.1.296 or later.
+
+### As a .skill file (Claude Desktop, Cowork, claude.ai)
+
+Download `haiku-delegate.skill` from the [latest release](https://github.com/acus9345/haiku-delegate/releases/latest) and upload it under Settings → Capabilities → Skills. The file contains the skill only. Without `haiku-worker`, the skill uses general-purpose agents on Haiku that read the same rules from `references/worker-rules.md`.
+
+### By hand
+
 ```bash
 git clone https://github.com/acus9345/haiku-delegate ~/.claude/skills/haiku-delegate
-```
-
-Then install the agent the skill launches, which runs on Haiku and auto-compacts at a 100,000-token window (this needs Claude Code v2.1.296 or later):
-
-```bash
 mkdir -p ~/.claude/agents && cp ~/.claude/skills/haiku-delegate/agents/haiku-worker.md ~/.claude/agents/
 ```
-
-Without it, the skill falls back to `general-purpose` agents on Haiku, which compact at the model's default window.
 
 ## Files
 
@@ -38,5 +54,6 @@ Without it, the skill falls back to `general-purpose` agents on Haiku, which com
 - `references/releases.md`: release preflight, 2FA, `NEEDS_USER` handling, and releases that CI publishes.
 - `references/not-for-haiku.md`: what stays on the main model, and why.
 - `references/worked-example.md`: publishing 5 npm packages end to end.
+- `.claude-plugin/`: the plugin manifest and a one-plugin marketplace, so the repo installs with `/plugin`.
 - `agents/haiku-worker.md`: the subagent definition (Haiku, no nested agents or direct file edits, 100,000-token auto-compact window, the fixed rules).
 - `workspace/`: the dry runs used to develop the skill. It holds the eval prompts, the test fixtures (`scripts/make-fixtures.sh` rebuilds them, including their git history), the generated plans, briefs and feedback for iterations 1 to 3 (iteration 3 tests the slimmer skill), and a snapshot and diff of each skill version. The repo copies under `workspace/iteration-*/` have had their `.git` folders removed.

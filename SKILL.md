@@ -54,7 +54,7 @@ Agent({ description: "Publish @acme/core 1.0.0", subagent_type: "haiku-worker",
         model: "haiku", run_in_background: true, prompt: "<brief>" })
 ```
 
-`haiku-worker` (`~/.claude/agents/haiku-worker.md`) runs on Haiku. It holds the fixed rules, can't spawn agents or edit files, and compacts at 100k tokens. If it isn't available, use `general-purpose` with `model: "haiku"`, and add the worker-rules line from brief-template.md.
+`haiku-worker` runs on Haiku. It's listed as `haiku-worker` when installed in `~/.claude/agents/`, and as `haiku-delegate:haiku-worker` when it comes from the plugin; use whichever name the agent list shows. It holds the fixed rules, can't spawn agents or edit files, and compacts at 100k tokens. If it isn't available, use `general-purpose` with `model: "haiku"`, and add the worker-rules line from brief-template.md.
 
 - At most 4 agents at once. Launch every ready brief in one message. When one finishes, verify it, then launch whatever it unblocks.
 - Run them in the background and keep working. You'll be notified when they finish, so don't poll.
